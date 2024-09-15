@@ -8,17 +8,22 @@ namespace CheckoutService_TestTask.StepDefinitions
     [Binding]
     public class CheckoutServiceAPIStepDefinitions
     {
-        private HttpClient? _client;
-        private Order? _orderModel;
-        private HttpResponseMessage? _response;
+        private Order _orderModel;
         private double _total;
+        private readonly HttpClient _client;
+        private HttpResponseMessage? _response;
+
+        public CheckoutServiceAPIStepDefinitions(IHttpClientFactory httpClientFactory)
+        {
+            _client = httpClientFactory.CreateClient("CheckoutApiClient"); 
+        }
 
         [BeforeScenario]
         public void BeforeScenario()
         {
-            _client = new HttpClient { BaseAddress = new Uri("http://localhost:5000/") };
             _orderModel = new Order(new List<OrderItem>());
             _total = 0;
+            _response = null;
         }
 
         [Given(@"a group of (.*) people order (.*) starters, (.*) mains, and (.*) drinks at (.*)")]
@@ -33,22 +38,17 @@ namespace CheckoutService_TestTask.StepDefinitions
         }
 
         [When(@"the bill is requested via the API")]
-        public void WhenTheBillIsRequestedViaTheAPI()
+        public async Task WhenTheBillIsRequestedViaTheAPI()
         {
             var content = new StringContent(JsonConvert.SerializeObject(_orderModel), Encoding.UTF8, "application/json");
-            _response = _client.PostAsync("api/checkout/calculate", content).Result;
-            var resultContent = _response.Content.ReadAsStringAsync().Result;
+            _response = await _client.PostAsync("api/checkout/calculate", content);
+            var resultContent = await _response.Content.ReadAsStringAsync();
             dynamic result = JsonConvert.DeserializeObject(resultContent);
             _total = result.total;
         }
 
-        public Order? Get_orderModel()
-        {
-            return _orderModel;
-        }
-
         [When(@"(.*) more people join at (.*) and order (.*) mains and (.*) drinks")]
-        public void WhenMorePeopleJoinAtAndOrderMainsAndDrinks(int amountOfPeople, string time, int mains, int drinks, Order? _orderModel)
+        public void WhenMorePeopleJoinAtAndOrderMainsAndDrinks(int amountOfPeople, string time, int mains, int drinks)
         {
             _orderModel.Items.Add(new OrderItem(Enums.ItemType.Main, mains, DateTime.Parse(time)));
             _orderModel.Items.Add(new OrderItem(Enums.ItemType.Drink, drinks, DateTime.Parse(time)));
