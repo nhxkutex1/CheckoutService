@@ -9,22 +9,15 @@ namespace CheckoutService_TestTask.StepDefinitions
     public class CheckoutServiceAPIStepDefinitions
     {
         private readonly HttpClient _client;
-        private HttpResponseMessage? _response;
-        private double _total;
+        private readonly ScenarioContext _scenarioContext;
         private Order _orderModel;
+        private HttpResponseMessage? _response;
 
-        
-        public CheckoutServiceAPIStepDefinitions(Order orderModel)
+        public CheckoutServiceAPIStepDefinitions(Order orderModel, ScenarioContext scenarioContext)
         {
             _client = new HttpClient { BaseAddress = new Uri("http://localhost:5000/") };
             _orderModel = orderModel;
-        }
-
-        // This hook runs after every scenario
-        [AfterScenario]
-        public void TearDown()
-        {
-            _client?.Dispose();        
+            _scenarioContext = scenarioContext;
         }
 
         [Given(@"a group of (.*) people order (.*) starters, (.*) mains, and (.*) drinks at (.*)")]
@@ -45,19 +38,8 @@ namespace CheckoutService_TestTask.StepDefinitions
             _response = _client.PostAsync("api/checkout/calculate", content).Result;
             var resultContent = _response.Content.ReadAsStringAsync().Result;
             dynamic result = JsonConvert.DeserializeObject(resultContent);
-            _total = result.total;
-        }
-
-        [Then(@"the total bill should be calculated based on current prices")]
-        public void ThenTheTotalBillShouldBeCalculatedBasedOnCurrentPrices()
-        {
-            Assert.Equals(_orderModel.GetTotal(), _total);
-        }
-
-        [Then(@"the total bill should be £(.*)")]
-        public void ThenTheTotalBillShouldBe(double expectedTotal)
-        {
-            Assert.AreEqual(expectedTotal, _total);
+            var total = result.total;
+            _scenarioContext["Total"] = total;
         }
 
         [When(@"(.*) more people join at (.*) and order (.*) mains and (.*) drinks")]
@@ -71,6 +53,27 @@ namespace CheckoutService_TestTask.StepDefinitions
         public void WhenAMemberCancelsTheirOrderNumber(int amount)
         {
             _orderModel.RemoveOrderItemEachByAmount(amount);
+        }
+
+        [Then(@"the total bill should be calculated based on current prices")]
+        public void ThenTheTotalBillShouldBeCalculatedBasedOnCurrentPrices()
+        {
+            var actualTotal = (double)_scenarioContext["Total"];
+            Assert.AreEqual(_orderModel.GetTotal(), actualTotal);
+        }
+
+        [Then(@"the total bill should be £(.*)")]
+        public void ThenTheTotalBillShouldBe(double expectedTotal)
+        {
+            var actualTotal = (double)_scenarioContext["Total"];
+            Assert.AreEqual(expectedTotal, actualTotal);
+        }
+
+        [Then(@"the API response status code should be (.*)")]
+        public void ThenTheAPIResponseStatusCodeShouldBe(int expectedStatusCode)
+        {
+            Assert.IsNotNull(_response, "The response should not be null.");
+            Assert.AreEqual(expectedStatusCode, (int)_response.StatusCode);
         }
     }
 }

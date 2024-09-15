@@ -47,5 +47,4 @@ public class Order
     {
         return GetFoodTotal() + GetDrinkTotal() + GetServiceCharge();
     }
-
 }
