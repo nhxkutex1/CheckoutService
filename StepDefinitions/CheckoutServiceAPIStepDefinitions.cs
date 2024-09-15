@@ -8,20 +8,21 @@ namespace CheckoutService_TestTask.StepDefinitions
     [Binding]
     public class CheckoutServiceAPIStepDefinitions
     {
-        private readonly HttpClient _client;
-        private readonly ScenarioContext _scenarioContext;
-        private Order _orderModel;
+        private HttpClient? _client;
+        private Order? _orderModel;
         private HttpResponseMessage? _response;
+        private double _total;
 
-        public CheckoutServiceAPIStepDefinitions(Order orderModel, ScenarioContext scenarioContext)
+        [BeforeScenario]
+        public void BeforeScenario()
         {
             _client = new HttpClient { BaseAddress = new Uri("http://localhost:5000/") };
-            _orderModel = orderModel;
-            _scenarioContext = scenarioContext;
+            _orderModel = new Order(new List<OrderItem>());
+            _total = 0;
         }
 
         [Given(@"a group of (.*) people order (.*) starters, (.*) mains, and (.*) drinks at (.*)")]
-        public void GivenAGroupOfPeopleOrderStartersMainsAndDrinksAt(int amoutOfPeople, int starters, int mains, int drinks, string time)
+        public void GivenAGroupOfPeopleOrderStartersMainsAndDrinksAt(int amountOfPeople, int starters, int mains, int drinks, string time)
         {
             if (time == "<time>")
                 time = DateTime.Now.ToString("HH:mm");
@@ -38,12 +39,16 @@ namespace CheckoutService_TestTask.StepDefinitions
             _response = _client.PostAsync("api/checkout/calculate", content).Result;
             var resultContent = _response.Content.ReadAsStringAsync().Result;
             dynamic result = JsonConvert.DeserializeObject(resultContent);
-            var total = result.total;
-            _scenarioContext["Total"] = total;
+            _total = result.total;
+        }
+
+        public Order? Get_orderModel()
+        {
+            return _orderModel;
         }
 
         [When(@"(.*) more people join at (.*) and order (.*) mains and (.*) drinks")]
-        public void WhenMorePeopleJoinAtAndOrderMainsAndDrinks(int amoutOfPeople, string time, int mains, int drinks)
+        public void WhenMorePeopleJoinAtAndOrderMainsAndDrinks(int amountOfPeople, string time, int mains, int drinks, Order? _orderModel)
         {
             _orderModel.Items.Add(new OrderItem(Enums.ItemType.Main, mains, DateTime.Parse(time)));
             _orderModel.Items.Add(new OrderItem(Enums.ItemType.Drink, drinks, DateTime.Parse(time)));
@@ -58,15 +63,13 @@ namespace CheckoutService_TestTask.StepDefinitions
         [Then(@"the total bill should be calculated based on current prices")]
         public void ThenTheTotalBillShouldBeCalculatedBasedOnCurrentPrices()
         {
-            var actualTotal = (double)_scenarioContext["Total"];
-            Assert.AreEqual(_orderModel.GetTotal(), actualTotal);
+            Assert.AreEqual(_orderModel.GetTotal(), _total);
         }
 
         [Then(@"the total bill should be £(.*)")]
         public void ThenTheTotalBillShouldBe(double expectedTotal)
         {
-            var actualTotal = (double)_scenarioContext["Total"];
-            Assert.AreEqual(expectedTotal, actualTotal);
+            Assert.AreEqual(expectedTotal, _total);
         }
 
         [Then(@"the API response status code should be (.*)")]
